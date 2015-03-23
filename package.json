@@ -1,0 +1,30 @@
+{
+  "name": "peer-harvest",
+  "version": "1.0.0",
+  "description": "A small script to gather Bittorrent Peer IPs",
+  "main": "peer-harvest.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Stefan-Code/peer-harvest.git"
+  },
+  "author": "Stefan.github@gmail.com",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Stefan-Code/peer-harvest/issues"
+  },
+  "homepage": "https://github.com/Stefan-Code/peer-harvest",
+  "dependencies": {
+    "bittorrent-dht": "^3.0.0",
+    "magnet-uri": "^4.2.2",
+    "string.prototype.endswith": "^0.2.0",
+    "string.prototype.startswith": "^0.2.0",
+    "winston": "^0.9.0",
+    "yargs": "^3.5.4",
+    "bittorrent-tracker": "^3.2.1",
+    "parse-torrent": "^4.0.0"
+  },
+  "devDependencies": {}
+}
