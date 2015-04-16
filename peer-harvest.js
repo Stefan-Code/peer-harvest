@@ -42,14 +42,16 @@ var argv = require('yargs')
     .default('dht-port', 20000)
     .describe('dht-port', 'The Port to be used for DHT')
     .alias('t', 'timeout')
-    .default('timeout', 300)
-    .describe('timeout', 'The timout in seconds after the program terminates and stops looking for new Peers')
+    .default('t', 300)
+    .describe('t', 'The timout in seconds after the program terminates and stops looking for new Peers')
     .alias('p', 'torrent-port')
-    .default('torrent-port', 6881)
-    .describe('torrent-port', "The Port we are listening on for Bittorrent connections")
+    .default('p', 6881)
+    .describe('p', "The Port we are listening on for Bittorrent connections")
     .alias('l', 'trackers')
     .describe('l', "A comma seperated list of trackers to query")
     .default('l', "udp://open.demonii.com:1337,udp://tracker.coppersurfer.tk:6969")
+    .boolean("overwrite")
+    .describe("overwrite", "Overwrite output file if it already exists")
     .demand(1)
     .help('h')
     .alias('h', 'help')
@@ -186,7 +188,7 @@ announceList:
   announce: 
    trackers}
 }
-var clientstring = "NT3-2-1--";
+var clientstring = "NT0-0-1--";
 var choices = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 var randomstring = "";
 for(var i = 0; i<11; i++) {
@@ -262,8 +264,29 @@ function debug_ips() {
 }
 
 function persist_ips() {
-    
+if(!argv.overwrite) {
+var throwOutfileError = false;
+try {
+        var outfilestats = fs.lstatSync(argv.outFile);
+        if (outfilestats.isFile()) {
+            winston.error(util.format("The output file '%s' aready exists, if you wish to overwrite, add the overwrite option", argv.outFile));
+            throwOutfileError = true;
+            
+        }
+
+    }
+    catch (e) {
+        winston.debug("Passed Output file check. Continuing.'")
+    } 
+    if(throwOutfileError) {
+    throw {
+                name: "File Error",
+                message: util.format("The output file '%s' you specified already exist", argv.outFile)
+            };
+    }
+}    
 for(var i=0;i<ips.length;i++) {
+
 fs.appendFileSync(argv.outFile, ips[i]+'\n');
 }
 winston.info(util.format("Got %d ips", ips.length))
