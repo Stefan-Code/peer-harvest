@@ -25,7 +25,7 @@ node peer-harvest.js --out-file peers.txt B415C913643E5FF49FE37D304BBB5E6E11AD51
 
 There are also many other options:
 ```txt
-Usage: C:\Users\SK\Programming\peer-harvest\peer-harvest.js -o peers.txt some.torrent | INFO_HASH | magnet:url
+Usage: node peer-harvest.js -o peers.txt some.torrent | INFO_HASH | magnet:url
 
 Options:
   -v, --verbosity     output verbosity. 0: errors, 1:warnings, 2:info, 3:debug                            [default: 2]
