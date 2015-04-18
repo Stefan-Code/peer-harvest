@@ -22,7 +22,7 @@ var disable_check = function disable_check(argv, b) {
 }
 //setup arguments parser
 var argv = require('yargs')
-    .usage('Usage: $0 -o peers.txt some.torrent | INFO_HASH | magnet:url')
+    .usage('Usage: node peer-harvest.js -o peers.txt some.torrent | INFO_HASH | magnet:url')
     .alias('v', 'verbosity')
     .default('v', 2)
     .describe("v", "output verbosity. 0: errors, 1:warnings, 2:info, 3:debug")
