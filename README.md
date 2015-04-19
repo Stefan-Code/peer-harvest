@@ -28,18 +28,19 @@ There are also many other options:
 Usage: node peer-harvest.js -o peers.txt some.torrent | INFO_HASH | magnet:url
 
 Options:
-  -v, --verbosity     output verbosity. 0: errors, 1:warnings, 2:info, 3:debug                            [default: 2]
-  --disable-dht       Disable DHT and use Trackers only                                                 
-  --disable-trackers  Disable Trackers and use DHT only                                                 
-  --print-peers       sends all peers to stdout - useful with the --silent option to parse output       
-  -s, --silent        supress any unnecessary output                                                    
-  -o, --out-file      Specify the file IPs will get written to                                            [default: "peers.txt"]
-  --dht-port          The Port to be used for DHT                                                         [default: 20000]
-  -t, --timeout       The timout in seconds after the program terminates and stops looking for new Peers  [default: 300]
-  -p, --torrent-port  The Port we are listening on for Bittorrent connections                             [default: 6881]
-  -l, --trackers      A comma seperated list of trackers to query                                         [default: "udp://open.demonii.com:1337,udp://tracker.coppersurfer.tk:6969"]
-  --overwrite         Overwrite output file if it already exists                                        
-  -h, --help          Show help                                                                         
+  -v, --verbosity            output verbosity. 0: errors, 1:warnings, 2:info, 3:debug                                                  [default: 2]
+  --disable-dht              Disable DHT and use Trackers only                                                                       
+  --disable-trackers         Disable Trackers and use DHT only                                                                       
+  --print-peers              sends all peers to stdout - useful with the --silent option to parse output                             
+  -s, --silent               supress any unnecessary output                                                                          
+  -o, --out-file             Specify the file IPs will get written to                                                                  [default: "peers.txt"]
+  --dht-port                 The Port to be used for DHT                                                                               [default: 20000]
+  -t, --timeout              The timout in seconds after the program terminates and stops looking for new Peers                        [default: 300]
+  -p, --torrent-port         The Port we are listening on for Bittorrent connections                                                   [default: 6881]
+  -l, --trackers             A comma seperated list of trackers to query                                                               [default: "udp://open.demonii.com:1337,udp://tracker.coppersurfer.tk:6969"]
+  --overwrite                Overwrite output file if it already exists                                                              
+  --disable-tracker-parsing  Disables looking for trackers in the torrent file or magnet link. Only uses those provided in --trackers
+  -h, --help                 Show help                                                                                               
 
 by stefan.github@gmail.com
 
