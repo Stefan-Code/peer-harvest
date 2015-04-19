@@ -52,6 +52,8 @@ var argv = require('yargs')
     .default('l', "udp://open.demonii.com:1337,udp://tracker.coppersurfer.tk:6969")
     .boolean("overwrite")
     .describe("overwrite", "Overwrite output file if it already exists")
+    .boolean("disable-tracker-parsing")
+    .describe("disable-tracker-parsing", "Disables looking for trackers in the torrent file or magnet link. Only uses those provided in --trackers")
     .demand(1)
     .help('h')
     .alias('h', 'help')
@@ -77,9 +79,9 @@ winston.remove(winston.transports.Console);
 }
 winston.debug("initialized.")
 winston.debug(util.format("winston level is %s"), winston.level);
-    // Do some basic parsing
-var argv_trackers = argv.trackers.split(",");
-trackers = trackers.concat(argv_trackers);
+// Do some basic parsing
+var argv_trackers = argv.trackers.split(","); // convert the tracker string of trackers from the arguments to an array
+trackers = trackers.concat(argv_trackers); // append the parsed trackers to the array
 var arg1 = argv._[0]
 var torrent_type;
 if (arg1.endsWith(".torrent")) {
@@ -124,7 +126,9 @@ if (arg1.startsWith("magnet:")) {
 var info_hash;
 if (torrent_type == "magnet") {
     var parsed = magnet(arg1);
-    trackers = trackers.concat(parsed.tr);
+    if(!argv.disableTrackerParsing) {
+        trackers = trackers.concat(parsed.tr);
+    }
     winston.info(util.format("converted magnet to info hash: '%s'", parsed.infoHash)); // 'e3811b9539cacff680e418124272177c47477157'
     //console.log(parsed);
     info_hash = parsed.infoHash;
