@@ -16,7 +16,7 @@ The script will also work with magnet links like so:
 ```bash
 node peer-harvest.js --out-file peers.txt "magnet:?xt=urn:btih:B415C913643E5FF49FE37D304BBB5E6E11AD5101&dn=ubuntu-14.10-desktop-amd64.iso&tr=http%3a%2f%2ftorrent.ubuntu.com%3a6969%2fannounce&tr=http%3a%2f%2fipv6.torrent.ubuntu.com%3a6969%2fannounce"
 ```
-It will also extract the Trackers from the magnet link and query them.
+It will also extract the Trackers from the magnet link and query them. Just make sure to wrap the magnet link url in quotes!
 
 For working just with a info hash you can do the following:
 ```bash
