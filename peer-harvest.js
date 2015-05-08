@@ -14,12 +14,12 @@ var trackers = [];
 winston.cli();
 var disable_check = function disable_check(argv, b) {
         if (argv.disableDht && argv.disableTrackers) {
-            winston.debug("Can't disable DHT AND Trackers. Only one is possible.'")
-            return "Failure! You can't disable both DHT and Trackers. Choose one."
+            winston.debug("Can't disable DHT AND Trackers. Only one is possible.'");
+            return "Failure! You can't disable both DHT and Trackers. Choose one.";
         } else {
             return true;
         }
-    }
+    };
     //setup arguments parser
 var argv = require('yargs')
     .usage('Usage: node peer-harvest.js -o peers.txt some.torrent | INFO_HASH | magnet:url')
@@ -77,12 +77,12 @@ if (argv.silent) {
     winston.remove(winston.transports.Console);
 
 }
-winston.debug("initialized.")
+winston.debug("initialized.");
 winston.debug(util.format("winston level is %s"), winston.level);
 // Do some basic parsing
 var argv_trackers = argv.trackers.split(","); // convert the tracker string of trackers from the arguments to an array
 trackers = trackers.concat(argv_trackers); // append the parsed trackers to the array
-var arg1 = argv._[0]
+var arg1 = argv._[0];
 var torrent_type;
 if (arg1.endsWith(".torrent")) {
     try {
@@ -93,12 +93,12 @@ if (arg1.endsWith(".torrent")) {
             winston.debug(util.format("torrent_type is %s", torrent_type));
         }
     } catch (e) {
-        winston.error("The Torrent File you specified cannot be found. Please check if the file exists and the name is correct.")
+        winston.error("The Torrent File you specified cannot be found. Please check if the file exists and the name is correct.");
         throw {
             name: "File Error",
-            message: util.format("The .torrent file '%s' you specified doesn't exist", arg1)
+            message: util.format("The .torrent file '%s' you specified doesn't exist", arg1),
         };
-    }
+    };
 } else {
     if (arg1.startsWith("magnet:")) {
         torrent_type = "magnet";
@@ -106,7 +106,7 @@ if (arg1.endsWith(".torrent")) {
     } else {
         //Then it has to be an info_hash
         if (arg1.length < 40) {
-            winston.error(utils.format("Invalid info hash '%s' supplied, please check your input.", arg1))
+            winston.error(utils.format("Invalid info hash '%s' supplied, please check your input.", arg1));
             throw {
                 name: "Input Error",
                 message: util.format("The info_hash '%s' you specified is not valid", arg1)
@@ -134,10 +134,10 @@ if (torrent_type == "magnet") {
 }
 if (torrent_type == "hash") {
     info_hash = arg1;
-    winston.debug(util.format("info_hash is '%s'", info_hash))
+    winston.debug(util.format("info_hash is '%s'", info_hash));
 }
 if (torrent_type == "file") {
-    winston.debug(util.format("reading file '%s'", arg1))
+    winston.debug(util.format("reading file '%s'", arg1));
     var torrent = fs.readFileSync(arg1);
     var parsedTorrent = parseTorrent(torrent);
     info_hash = parsedTorrent.infoHash;
@@ -145,17 +145,17 @@ if (torrent_type == "file") {
 }
 
 if (!argv.disableDht) {
-    var dht = new DHT()
+    var dht = new DHT();
     dht.listen(argv.dhtPort, function() {
-        winston.info(util.format('DHT Listening on Port %d - This may take a while'), argv.dhtPort)
+        winston.info(util.format('DHT Listening on Port %d - This may take a while'), argv.dhtPort);
     })
 
     dht.on('ready', function() {
-        winston.info("DHT active")
+        winston.info("DHT active");
             // DHT is ready to use (i.e. the routing table contains at least K nodes, discovered
             // via the bootstrap nodes)
             // find peers for the given torrent info hash
-        dht.lookup(info_hash)
+        dht.lookup(info_hash);
     })
 
     dht.on('error', function(err) {
@@ -187,7 +187,7 @@ if (!argv.disableTrackers) {
             infoHash: info_hash,
             announceList: [trackers],
             announce: trackers
-        }
+        };
     }
     var clientstring = "NT0-0-1--";
     var choices = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -199,8 +199,8 @@ if (!argv.disableTrackers) {
     winston.debug(util.format("using peer id '%s'", peerId));
     var bt_port = argv.torrentPort;
 
-    winston.info(util.format("Preparing to listen for Bittorrent connections on %s", bt_port))
-    var client = new Client(peerId, bt_port, parsedTorrent)
+    winston.info(util.format("Preparing to listen for Bittorrent connections on %s", bt_port));
+    var client = new Client(peerId, bt_port, parsedTorrent);
 
     client.on('error', function(err) {
         // fatal client error!
@@ -213,12 +213,12 @@ if (!argv.disableTrackers) {
     })
 
     // start getting peers from the tracker
-    client.start()
+    client.start();
     client.on('update', function(data) {
         winston.debug(data);
-        winston.debug('Tracker Announce: ' + data.announce)
-        winston.debug('Seeders: ' + data.complete)
-        winston.debug('Leechers: ' + data.incomplete)
+        winston.debug('Tracker Announce: ' + data.announce);
+        winston.debug('Seeders: ' + data.complete);
+        winston.debug('Leechers: ' + data.incomplete);
     })
 
     client.on('peer', function(addr) {
@@ -240,18 +240,18 @@ if (!argv.disableTrackers) {
     client.scrape();
     client.on('scrape', function(data) {
         winston.debug(data);
-        winston.debug('scrape response: ' + data.announce)
-        winston.debug('seeders: ' + data.complete)
-        winston.debug('leechers: ' + data.incomplete)
-        winston.debug('total downloads of torrent: ' + data.incomplete)
+        winston.debug('scrape response: ' + data.announce);
+        winston.debug('seeders: ' + data.complete);
+        winston.debug('leechers: ' + data.incomplete);
+        winston.debug('total downloads of torrent: ' + data.incomplete);
     });
 }
 //storage functions
 function store_ip(ip) {
     if (argv.printPeers) {
-        console.log(ip)
+        console.log(ip);
     }
-    ips.push(ip)
+    ips.push(ip);
 }
 
 function timeoutCallback() {
@@ -261,7 +261,7 @@ function timeoutCallback() {
 }
 
 function debug_ips() {
-    console.log(ips)
+    console.log(ips);
 }
 
 function persist_ips() {
@@ -273,23 +273,23 @@ function persist_ips() {
                 winston.error(util.format("The output file '%s' aready exists, if you wish to overwrite, add the overwrite option", argv.outFile));
                 throwOutfileError = true;
 
-            }
+            };
 
         } catch (e) {
-            winston.debug("Passed Output file check. Continuing.'")
+            winston.debug("Passed Output file check. Continuing.'");
         }
         if (throwOutfileError) {
             throw {
                 name: "File Error",
-                message: util.format("The output file '%s' you specified already exist", argv.outFile)
+                message: util.format("The output file '%s' you specified already exist", argv.outFile),
             };
-        }
+        };
     }
     for (var i = 0; i < ips.length; i++) {
 
         fs.appendFileSync(argv.outFile, ips[i] + '\n');
     }
-    winston.info(util.format("Got %d ips", ips.length))
+    winston.info(util.format("Got %d ips", ips.length));
 }
 
 function getRandomArbitrary(min, max) {
@@ -299,4 +299,4 @@ function getRandomArbitrary(min, max) {
 function choose(choices) {
     var index = Math.floor(Math.random() * choices.length);
     return choices[index];
-}
+};
