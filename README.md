@@ -1,5 +1,13 @@
 # peer-harvest
 ###A Script to gather the IP Adresses of Bittorrent Peers for a given Torrent
+##Installation
+Download the latest Release (not the current master branch, it may be unstable!) extract it and locate package.json.
+Also you need to have nodejs and npm installed.
+In this directory then run the following from the command line:
+```
+npm install
+```
+This will download all the necessary dependencies for you and put them in the right place.
 ##Usage:
 For built-in help run:
 ```bash
