@@ -6,9 +6,11 @@ var magnet = require('magnet-uri');
 var Client = require('bittorrent-tracker');
 var parseTorrent = require('parse-torrent');
 var fs = require('fs');
+var HashMap = require('hashmap');
 require('string.prototype.endswith');
 require('string.prototype.startswith');
-var ips = [];
+//var ips = []; //switching to hashmap!
+var ip_hashmap = new HashMap();
 var trackers = [];
 // winston.level = 'debug';
 winston.cli();
@@ -251,7 +253,8 @@ function store_ip(ip) {
     if (argv.printPeers) {
         console.log(ip);
     }
-    ips.push(ip);
+    //ips.push(ip); //deprecated, we are using a hashmap instead
+    ip_hashmap.set(ip, true);
 }
 
 function timeoutCallback() {
@@ -261,35 +264,56 @@ function timeoutCallback() {
 }
 
 function debug_ips() {
-    console.log(ips);
+    console.log(ip_hashmap.keys());
 }
 
 function persist_ips() {
+	//BUG: move this check to the beginning of the file to waste less time...
     if (!argv.overwrite) {
-        var throwOutfileError = false;
-        try {
-            var outfilestats = fs.lstatSync(argv.outFile);
-            if (outfilestats.isFile()) {
-                winston.error(util.format("The output file '%s' aready exists, if you wish to overwrite, add the overwrite option", argv.outFile));
-                throwOutfileError = true;
-
-            };
-
-        } catch (e) {
-            winston.debug("Passed Output file check. Continuing.'");
-        }
-        if (throwOutfileError) {
-            throw {
+    	if(is_file(argv.outFile)) {
+    		winston.error(util.format("The output file '%s' aready exists, if you wish to overwrite, add the overwrite option", argv.outFile));
+    		throw {
                 name: "File Error",
                 message: util.format("The output file '%s' you specified already exist", argv.outFile),
             };
-        };
-    }
-    for (var i = 0; i < ips.length; i++) {
+    	}
+    	else {
+    		winston.debug("Passed Output file check. Continuing.'");
+    	} 
 
-        fs.appendFileSync(argv.outFile, ips[i] + '\n');
+            
+        }
+    else {
+    	//check if file exists, if yes, delete it!
     }
-    winston.info(util.format("Got %d ips", ips.length));
+    ip_hashmap.forEach(function(value, key) {
+    	fs.appendFileSync(argv.outFile, key + '\n');
+    });
+    //for the array:
+//    for (var i = 0; i < ips.length; i++) {
+//    	//BUG: #6: when --overwrite is set, delete file first if it exists
+//    	//TODO: #7 add --disable-out-file switch
+//        fs.appendFileSync(argv.outFile, ips[i] + '\n');
+//    }
+    winston.info(util.format("Got %d ips", ip_hashmap.keys().length));
+}
+
+function is_file(file) {
+	var throwOutfileError = false;
+    try {
+        var outfilestats = fs.lstatSync(file);
+        if (outfilestats.isFile()) {
+            //winston.error(util.format("The output file '%s' aready exists, if you wish to overwrite, add the overwrite option", argv.outFile));
+            throwOutfileError = true;
+
+        };
+
+    } catch (e) {
+        return false;
+    }
+    if (throwOutfileError) {
+        return true;
+    };
 }
 
 function getRandomArbitrary(min, max) {
