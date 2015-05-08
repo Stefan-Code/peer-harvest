@@ -353,7 +353,7 @@ function is_file(file) {
 function getRandomArbitrary(min, max) {
     return Math.random() * (max - min) + min;
 }
-//chooses a radnom element from a specified array. Used to generate the peer id
+//chooses a random element from a specified array. Used to generate the peer id
 function choose(choices) {
     var index = Math.floor(Math.random() * choices.length);
     return choices[index];
