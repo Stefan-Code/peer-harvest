@@ -62,6 +62,8 @@ var argv = require('yargs')
     .default('l', "udp://open.demonii.com:1337,udp://tracker.coppersurfer.tk:6969")
     .boolean("overwrite")
     .describe("overwrite", "Overwrite output file if it already exists")
+    .boolean("append")
+    .describe("append", "Append to the output file if it already exists - CAREFUL: This may lead to duplicates in the output file!")
     .boolean("disable-tracker-parsing")
     .describe("disable-tracker-parsing", "Disables looking for trackers in the torrent file or magnet link. Only uses those provided in --trackers")
     .demand(1)
@@ -96,6 +98,9 @@ var arg1 = argv._[0]; //this is the info_hash, torrent file or magnet link the u
 //this contains the type of the torrent the user specified. populated later
 var torrent_type; //either "hash", "magnet" or "file"
 //Do some basic parsing of the input
+//check if the outFile specified is ok
+//this fixes #6
+check_outfile();
 //Case: Torrent File
 if (arg1.endsWith(".torrent")) {
 	//make sure the torrent file exists. If not, throw an exception
@@ -302,36 +307,34 @@ function debug_ips() {
 }
 //writes gathered ips to disk
 function persist_ips() {
-	//BUG: move this check to the beginning of the file to waste less time...
-    if (!argv.overwrite) {
-    	if(is_file(argv.outFile)) {
-    		winston.error(util.format("The output file '%s' aready exists, if you wish to overwrite, add the overwrite option", argv.outFile));
-    		throw {
-                name: "File Error",
-                message: util.format("The output file '%s' you specified already exist", argv.outFile),
-            };
-    	}
-    	else {
-    		winston.debug("Passed Output file check. Continuing.'");
-    	} 
-
-            
+	check_outfile(); 
+    if ( argv.overwrite && is_file(argv.outFile)) {
+    		//delete the file if it exists
+    		delete_outfile();
         }
-    else {
-    	//check if file exists, if yes, delete it!
-    }
+//	//BUG: #6: when --overwrite is set, delete file first if it exists
+//	//TODO: #7 add --disable-out-file switch
     ip_hashmap.forEach(function(value, key) {
     	fs.appendFileSync(argv.outFile, key + '\n');
     });
-    //for the array:
-//    for (var i = 0; i < ips.length; i++) {
-//    	//BUG: #6: when --overwrite is set, delete file first if it exists
-//    	//TODO: #7 add --disable-out-file switch
-//        fs.appendFileSync(argv.outFile, ips[i] + '\n');
-//    }
+
+
     winston.info(util.format("Got %d ips", ip_hashmap.keys().length));
 }
 //checks if a file exists on the filesystem
+function delete_outfile() {
+	try {
+		fs.unlinkSync(argv.outFile);
+	}
+	catch(error) {
+		winston.error(util.format("failed to delete file '%s', aborting!", argv.outfile));
+		throw {
+            name: "File Error",
+            message: util.format("The output file '%s' you specified could not be deleted (--overwrite)", argv.outFile),
+        };
+	}
+	
+}
 function is_file(file) {
 	var throwOutfileError = false;
     try {
@@ -348,6 +351,22 @@ function is_file(file) {
     if (throwOutfileError) {
         return true;
     };
+}
+
+function check_outfile() {
+	if ( ! (argv.overwrite || argv.append) ) {
+
+	if(is_file(argv.outFile)) {
+		winston.error(util.format("The output file '%s' aready exists, if you wish to overwrite, add the overwrite option", argv.outFile));
+		throw {
+            name: "File Error",
+            message: util.format("The output file '%s' you specified already exist", argv.outFile),
+        };
+	}
+	else {
+		winston.debug("Passed Output file check. Continuing.'");
+	} 
+    }
 }
 //returns a random number between min and max. Currently unused
 function getRandomArbitrary(min, max) {
