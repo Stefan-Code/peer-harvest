@@ -184,6 +184,12 @@ if (torrent_type == "file") {
     var torrent = fs.readFileSync(arg1);
     //parse the torrent file contents
     var parsedTorrent = parseTorrent(torrent);
+    //BUG:#3
+    //hack required to somehow remove the trackers stored in the parsedTorrent object
+    if(argv.disableTrackerParsing) {
+    	parsedTorrent.announce = [];
+    	parsedTorrent.announceList = [];
+    }
     //set the info hash to the one we got from the torrent file
     info_hash = parsedTorrent.infoHash;
     winston.info(util.format("Torrent File has info hash '%s'", info_hash));
