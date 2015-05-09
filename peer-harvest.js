@@ -21,13 +21,22 @@ var trackers = [];
 // winston.level = 'debug';
 //enable some color magic with winston
 winston.cli();
-//this check is to make sure not all means of gathering IP adresses are disabled
+//this check is to make sure not all means of gathering IP adresses are disabled and that in general no conflicting options are set!
 var disable_check = function disable_check(argv, b) {
+		var failures = [];
         if (argv.disableDht && argv.disableTrackers) {
-            winston.debug("Can't disable DHT AND Trackers. Only one is possible.'");
-            return "Failure! You can't disable both DHT and Trackers. Choose one.";
-        } else {
-            return true;
+            winston.error("Can't disable DHT AND Trackers. Only one is possible.'");
+            failures.push("Failure! You can't disable both DHT and Trackers. Choose one.");
+        }
+        if(argv.overwrite && argv.append) {
+        	winston.error("Can't enable --overwrite and --append. Only one is possible.'");
+            failures.push("Failure! You can't overwrite AND append to the output file. Choose one.");
+        }
+        if(failures.length !== 0) {
+        	return failures.join("\n");
+        }
+        else {
+        	return true;
         }
     };
     //setup arguments parser
@@ -40,7 +49,6 @@ var argv = require('yargs')
     .describe('disable-dht', 'Disable DHT and use Trackers only')
     .boolean('disable-trackers')
     .describe('disable-trackers', 'Disable Trackers and use DHT only')
-    .check(disable_check)
     .boolean('print-peers')
     .describe('print-peers', "sends all peers to stdout - useful with the --silent option to parse output")
     .boolean('s')
@@ -64,13 +72,16 @@ var argv = require('yargs')
     .describe("overwrite", "Overwrite output file if it already exists")
     .boolean("append")
     .describe("append", "Append to the output file if it already exists - CAREFUL: This may lead to duplicates in the output file!")
+    .boolean("disable-out-file")
+    .describe("disable-out-file", "Disables output to file. Useful together with --print-peers.")
     .boolean("disable-tracker-parsing")
     .describe("disable-tracker-parsing", "Disables looking for trackers in the torrent file or magnet link. Only uses those provided in --trackers")
     .demand(1)
     .help('h')
     .alias('h', 'help')
     .epilog("by stefan.github@gmail.com")
-    .string('_')
+    .string('_') //TODO: what the heck does this do again??
+    .check(disable_check)
     .argv;
 //setup logging verbosity
 if (argv.v <= 0) {
@@ -98,9 +109,16 @@ var arg1 = argv._[0]; //this is the info_hash, torrent file or magnet link the u
 //this contains the type of the torrent the user specified. populated later
 var torrent_type; //either "hash", "magnet" or "file"
 //Do some basic parsing of the input
+
+//--disable-out-file takes priority and disables anything dangerous that might modify files!
+if(argv.disableOutFile) {
+	argv.overwrite = false;
+	argv.append = false;
+}
 //check if the outFile specified is ok
 //this fixes #6
 check_outfile();
+
 //Case: Torrent File
 if (arg1.endsWith(".torrent")) {
 	//make sure the torrent file exists. If not, throw an exception
@@ -308,16 +326,16 @@ function debug_ips() {
 //writes gathered ips to disk
 function persist_ips() {
 	check_outfile(); 
-    if ( argv.overwrite && is_file(argv.outFile)) {
+    if ( argv.overwrite && is_file(argv.outFile) && !argv.disableOutFile) {
     		//delete the file if it exists
     		delete_outfile();
         }
-//	//BUG: #6: when --overwrite is set, delete file first if it exists
-//	//TODO: #7 add --disable-out-file switch
+//	//This fixes #7, "add --disable-out-file switch"
+    if(!argv.disableOutFile) {
     ip_hashmap.forEach(function(value, key) {
     	fs.appendFileSync(argv.outFile, key + '\n');
     });
-
+    }
 
     winston.info(util.format("Got %d ips", ip_hashmap.keys().length));
 }
@@ -354,7 +372,7 @@ function is_file(file) {
 }
 
 function check_outfile() {
-	if ( ! (argv.overwrite || argv.append) ) {
+	if ( ! (argv.overwrite || argv.append || argv.disableOutFile) ) {
 
 	if(is_file(argv.outFile)) {
 		winston.error(util.format("The output file '%s' aready exists, if you wish to overwrite, add the overwrite option", argv.outFile));
