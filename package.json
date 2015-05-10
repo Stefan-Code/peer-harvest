@@ -1,6 +1,6 @@
 {
   "name": "peer-harvest",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "A small script to gather Bittorrent Peer IPs",
   "main": "peer-harvest.js",
   "scripts": {
