@@ -1,3 +1,4 @@
+//@author: Stefan.github@gmail.com
 //require filesystem stuff
 var fs = require("fs");
 //util for formatting strings
@@ -9,6 +10,9 @@ var DHT = require('bittorrent-dht');
 var magnet = require('magnet-uri');
 var Client = require('bittorrent-tracker');
 var parseTorrent = require('parse-torrent');
+var Swarm = require('bittorrent-swarm');
+var ut_pex = require('ut_pex'); //PEX
+var pex_active = false;
 //Hashmap for storing ips
 var HashMap = require('hashmap');
 //string utility functions
@@ -16,7 +20,7 @@ require('string.prototype.endswith');
 require('string.prototype.startswith');
 //contains all the gathered IP adresses
 var ip_hashmap = new HashMap();
-//contains all the trackers we will q#!/usr/bin/env nodejsuery
+//contains all the trackers we will query
 var trackers = [];
 // winston.level = 'debug';
 //enable some color magic with winston
@@ -48,6 +52,8 @@ var argv = require('yargs')
     .describe('disable-dht', 'Disable DHT and use Trackers only')
     .boolean('disable-trackers')
     .describe('disable-trackers', 'Disable Trackers and use DHT only')
+    .boolean('disable-pex')
+    .describe('disable-pex', 'Disable Peer Exchange')
     .boolean('print-peers')
     .describe('print-peers', "sends all peers to stdout - useful with the --silent option to parse output")
     .boolean('s')
@@ -58,6 +64,8 @@ var argv = require('yargs')
     .describe('o', 'Specify the file IPs will get written to')
     .default('dht-port', 20000)
     .describe('dht-port', 'The Port to be used for DHT')
+    .default('max-connections', 2000)
+    .describe('max-connections', 'Max. number of connections for PEX')
     .alias('t', 'timeout')
     .default('t', 420)
     .describe('t', 'The timout in seconds after the program terminates and stops looking for new Peers. Set to \'0\' (zero) to disable.')
@@ -121,7 +129,18 @@ if (argv.disableOutFile) {
 //check if the outFile specified is ok
 //this fixes #6
 check_outfile();
-
+//The fixed peer id part. Contains a string to identify the client type and the client version
+var clientstring = "NT0-0-1--";
+//possible choices for the random part of the peer id
+var choices = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+var randomstring = "";
+//generate random part of peer id
+for (var i = 0; i < 11; i++) {
+    randomstring += choose(choices);
+}
+//set the peer id (has to be a Buffer)
+var peerId = new Buffer(clientstring + randomstring);
+winston.info(util.format("using peer id '%s'", peerId));
 //Case: Torrent File
 if (arg1.endsWith(".torrent")) {
     //make sure the torrent file exists. If not, throw an exception
@@ -218,15 +237,15 @@ if (!argv.disableDht) {
         })
         //fires ALWAYS when a peer has been discovered
     dht.on('peer', function(addr, hash, from) {
-            store_ip(addr);
-            store_ip(from);
-            winston.debug(util.format('found peer %s through %s', addr, from));
+            store_ip(get_ip(addr), get_port(addr));
+            store_ip(get_ip(from), get_port(from));
+            winston.debug(util.format('[DHT] found peer %s through %s', addr, from));
         })
         //fires when the FIRST peer has been discovered
     dht.once('peer', function(addr, hash, from) {
-        store_ip(addr);
-        store_ip(from);
-        winston.info(util.format('started receiving peers: %s through %s', addr, from));
+    	store_ip(get_ip(addr), get_port(addr));
+    	store_ip(get_ip(from), get_port(from));
+        winston.info(util.format('[DHT] started receiving peers: %s through %s', addr, from));
     });
 }
 //setting a timeout to terminate the program. Otherwise it would just collect information indefinitely 
@@ -238,6 +257,44 @@ if (argv.timeoutNoPeers > 0) {
 }
 
 //If Trackers are not explicitly disabled, use them!
+if (!argv.disablePex) {
+	// PEX connection using bittorrent-swarm to handle connections.
+    winston.info(util.format("Joining swarm for PEX"));
+    var swarm = new Swarm(info_hash, peerId);
+    //FIXME: Add switch to customize port for PEX
+	//HACK:
+    swarm.maxConns = 1000;
+    swarm.on('error', function(error) { 
+    	winston.error(util.format("Swarm Error: %s"));
+    });
+    swarm.on('wire', function(wire) {
+    	 
+        wire.use(ut_pex())
+        
+    	// If you find a peer throught PEX, add it to the ip_hashmap then connect to it to get more peers.
+        wire.ut_pex.on('error', function(error) { 
+    	winston.error(util.format("PEX Error: %s"));
+        });
+        wire.ut_pex.on('peer', function (peer) {
+    	  var parts = peer.split(':');
+    	  var peer_ip = parts[0];
+    	  // Only add peers to the swarm that are unique. 
+          if (!ip_hashmap.has(peer_ip)) {
+    		  // Add discovered peers to the swarm and ask for more PEX
+               swarm.addPeer(peer)
+               winston.debug(util.format('[PEX] found NEW peer %s | con %s / %s', peer, swarm.numPeers, ip_hashmap.keys().length));
+          } else {
+//    	      winston.debug(util.format('[PEX] found OLD peer %s and con %s / %s', peer, swarm.numPeers, friends.length));
+          }
+          if(!pex_active) {
+        	  winston.info(util.format('[PEX] started receiving peers: %s', peer));
+          }
+          store_ip(get_ip(peer), get_port(peer));
+          pex_active = true;
+          
+    	  });
+       });          
+}
 if (!argv.disableTrackers) {
     //deduplicate the trackers array
     trackers = trackers.filter(function(elem, pos) {
@@ -252,18 +309,6 @@ if (!argv.disableTrackers) {
             announce: trackers
         };
     }
-    //The fixed peer id part. Contains a string to identify the client type and the client version
-    var clientstring = "NT0-0-1--";
-    //possible choices for the random part of the peer id
-    var choices = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-    var randomstring = "";
-    //generate random part of peer id
-    for (var i = 0; i < 11; i++) {
-        randomstring += choose(choices);
-    }
-    //set the peer id (has to be a Buffer)
-    var peerId = new Buffer(clientstring + randomstring);
-    winston.debug(util.format("using peer id '%s'", peerId));
     //set the bittorrent port
     var bt_port = argv.torrentPort;
 
@@ -291,12 +336,13 @@ if (!argv.disableTrackers) {
         })
         //fires ALWAYS when a peer is found
     client.on('peer', function(addr) {
-        store_ip(addr);
+    	winston.debug(util.format('[TRACKER] found NEW peer %s', addr));
+    	store_ip(get_ip(addr), get_port(addr));
     });
     //fires once a peer is found
     client.once('peer', function(addr) {
-        winston.info(util.format('started receiving peers: %s from trackers', addr));
-        store_ip(addr);
+        winston.info(util.format('[TRACKER] started receiving peers: %s', addr));
+        store_ip(get_ip(addr), get_port(addr));
     });
     // announce that download has completed (and you are now a seeder)
     client.complete();
@@ -316,25 +362,45 @@ if (!argv.disableTrackers) {
         winston.debug('total downloads of torrent: ' + data.incomplete);
     });
 }
+
+function add_ip_to_swarm(ip) {
+	
+	
+} 
 //storage functions
 //store a ip adress (in hashmap, this doesn't write to disk. see persist_ips() for that)
-function store_ip(ip) {
-        if (argv.printPeers) {
-            console.log(ip);
-        }
+function store_ip(ip, port) {
+        
         //ips.push(ip); //deprecated, we are using a hashmap instead
         if (ip_hashmap.get(ip)) {
             //ip already exists	
         } else {
-            ip_hashmap.set(ip, true);
+        	if (argv.printPeers) {
+                console.log(ip);
+            }
+            ip_hashmap.set(ip, port);
+            //set the peer to the current time
             time_last_peer = new Date().getTime();
+            if(!argv.disablePex) {
+            swarm.addPeer(ip+":"+port);
+            //winston.debug(util.format('adding peer %s to swarm', ip));
+            //
+            }
         }
 
     }
-    //this fires once the timeout is reached
+
+process.on('SIGINT', function() {
+    winston.warn("Preparing to terminate because of user request. Press Ctrl + C again to force exit.");
+    timeoutCallback();
+
+});
+
+//this fires once the timeout is reached
 function timeoutCallback() {
         terminating = true;
         winston.info("terminating because of timeout!");
+        
         //write gathered ips to file
         persist_ips();
         //this raises an error when trackers are disabled
@@ -347,10 +413,17 @@ function timeoutCallback() {
         catch(e) {
         	//NOTHING
         }
+        try {
+        	swarm.destroy();
+        }
+        catch(e) {
+        	
+        }
         //terminate the program
         process.exit();
     }
-    //called every time the timeout-no-peers interval fires
+
+//called every time the timeout-no-peers interval fires
 function intervalCallback() {
         var delta = (new Date().getTime() - time_last_peer) / 1000;
         winston.debug(util.format("delta is %s", delta));
@@ -381,7 +454,7 @@ function persist_ips() {
         //	//This fixes #7, "add --disable-out-file switch"
         if (!argv.disableOutFile) {
             ip_hashmap.forEach(function(value, key) {
-                fs.appendFileSync(argv.outFile, key + '\n');
+                fs.appendFileSync(argv.outFile, key + +":"+value+'\n');
             });
         }
 
@@ -418,7 +491,13 @@ function is_file(file) {
         return true;
     };
 }
-
+//get ip adress from ip:port string
+function get_ip(ip_port_string) {
+	return ip_port_string.split(":")[0]
+}
+function get_port(ip_port_string) {
+	return ip_port_string.split(":")[1]
+}
 function check_outfile() {
         if (!(argv.overwrite || argv.append || argv.disableOutFile)) {
 
@@ -433,11 +512,13 @@ function check_outfile() {
             }
         }
     }
-    //returns a random number between min and max. Currently unused
+
+//returns a random number between min and max. Currently unused
 function getRandomArbitrary(min, max) {
         return Math.random() * (max - min) + min;
     }
-    //chooses a random element from a specified array. Used to generate the peer id
+
+//chooses a random element from a specified array. Used to generate the peer id
 function choose(choices) {
     var index = Math.floor(Math.random() * choices.length);
     return choices[index];
