@@ -263,7 +263,7 @@ if (!argv.disablePex) {
     var swarm = new Swarm(info_hash, peerId);
     //FIXME: Add switch to customize port for PEX
 	//HACK:
-    swarm.maxConns = 1000;
+    swarm.maxConns = argv.maxConnections;
     swarm.on('error', function(error) { 
     	winston.error(util.format("Swarm Error: %s"));
     });
@@ -391,7 +391,7 @@ function store_ip(ip, port) {
     }
 
 process.on('SIGINT', function() {
-    winston.warn("Preparing to terminate because of user request. Press Ctrl + C again to force exit.");
+    winston.warn("Preparing to terminate because of user request. ");
     timeoutCallback();
 
 });
@@ -454,7 +454,16 @@ function persist_ips() {
         //	//This fixes #7, "add --disable-out-file switch"
         if (!argv.disableOutFile) {
             ip_hashmap.forEach(function(value, key) {
-                fs.appendFileSync(argv.outFile, key + +":"+value+'\n');
+            	try {
+                fs.appendFileSync(argv.outFile, key +":"+value+'\n');
+            	}
+            	catch(e) {
+            		winston.error(util.format("Failed to write to file '%s'", argv.outFile));
+            		throw {
+                        name: "File Error",
+                        message: util.format("The output file '%s' you specified could not be opened.", argv.outFile),
+                    };
+            	}
             });
         }
 
