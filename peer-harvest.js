@@ -21,7 +21,7 @@ var trackers = [];
 // winston.level = 'debug';
 //enable some color magic with winston
 winston.cli();
-//this check is to make sure not all means of gathering IP adresses are disabled and that in general no conflicting options are set!
+//this check is to make sure not all means of gathering IP addresses are disabled and that in general no conflicting options are set!
 var disable_check = function disable_check(argv, b) {
     var failures = [];
     if (argv.disableDht && argv.disableTrackers) {
@@ -337,11 +337,17 @@ function timeoutCallback() {
         winston.info("terminating because of timeout!");
         //write gathered ips to file
         persist_ips();
+        //this raises an error when trackers are disabled
+        try {
+        	//gracefully leave the swarm
+        	client.stop();
+        	// ungracefully leave the swarm (without sending final 'stop' message)
+        	client.destroy();
+        }
+        catch(e) {
+        	//NOTHING
+        }
         //terminate the program
-        //gracefully leave the swarm
-        client.stop();
-        // ungracefully leave the swarm (without sending final 'stop' message)
-        client.destroy();
         process.exit();
     }
     //called every time the timeout-no-peers interval fires
