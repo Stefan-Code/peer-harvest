@@ -1,6 +1,6 @@
 {
   "name": "peer-harvest",
-  "version": "1.0.7",
+  "version": "1.1.0",
   "description": "A small script to gather Bittorrent Peer IPs",
   "main": "peer-harvest.js",
   "scripts": {
@@ -26,8 +26,8 @@
     "bittorrent-tracker": "^3.2.1",
     "parse-torrent": "^4.0.0",
     "hashmap": "^2.0.3",
-    "bittorrent-swarm":"^3.1.0",
-    "ut_pex":"^1.0.3"
+    "bittorrent-swarm": "^3.1.0",
+    "ut_pex": "^1.0.3"
   },
   "devDependencies": {}
 }
