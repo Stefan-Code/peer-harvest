@@ -5,6 +5,8 @@ var fs = require("fs");
 var util = require("util");
 //winston for logging
 var winston = require('winston');
+//debugging
+require('longjohn');
 //torrent libraries
 var DHT = require('bittorrent-dht');
 var magnet = require('magnet-uri');
