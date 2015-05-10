@@ -25,7 +25,9 @@
     "yargs": "^3.5.4",
     "bittorrent-tracker": "^3.2.1",
     "parse-torrent": "^4.0.0",
-    "hashmap": "^2.0.3"
+    "hashmap": "^2.0.3",
+    "bittorrent-swarm":"^3.1.0",
+    "ut_pex":"^1.0.3"
   },
   "devDependencies": {}
 }
