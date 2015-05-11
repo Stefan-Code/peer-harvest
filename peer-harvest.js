@@ -6,7 +6,6 @@ var util = require("util");
 //winston for logging
 var winston = require('winston');
 //debugging
-require('longjohn');
 //torrent libraries
 var DHT = require('bittorrent-dht');
 var magnet = require('magnet-uri');
@@ -47,6 +46,7 @@ var disable_check = function disable_check(argv, b) {
         return true;
     }
 };
+var version = require('./package.json').version;
 //setup arguments parser
 var argv = require('yargs')
     .usage('Usage: node peer-harvest.js -o peers.txt some.torrent | INFO_HASH | magnet:url')
@@ -97,7 +97,7 @@ var argv = require('yargs')
     .boolean("dev")
     .describe("dev", "Enables Development-only! features. Use when you know what you're doing")
     .version(function() {
-    return util.format("Version %s", require('./package.json').version);
+    return util.format("Version %s", version);
     })
     .strict()
     .demand(1) //demands one positional argument (filename, hash or magnet)
