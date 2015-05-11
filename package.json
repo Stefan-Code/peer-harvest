@@ -29,5 +29,5 @@
     "bittorrent-swarm": "^3.1.0",
     "ut_pex": "^1.0.3"
   },
-  "devDependencies": {}
+  "devDependencies": {"longjohn":"~0.2.4"}
 }

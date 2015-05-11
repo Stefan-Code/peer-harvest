@@ -15,6 +15,7 @@ var parseTorrent = require('parse-torrent');
 var Swarm = require('bittorrent-swarm');
 var ut_pex = require('ut_pex'); //PEX
 var pex_active = false;
+
 //Hashmap for storing ips
 var HashMap = require('hashmap');
 //string utility functions
@@ -87,6 +88,8 @@ var argv = require('yargs')
     .describe("overwrite", "Overwrite output file if it already exists")
     .boolean("append")
     .describe("append", "Append to the output file if it already exists - CAREFUL: This may lead to duplicates in the output file!")
+    .boolean("dev")
+    .describe("dev", "Enables Development-only! features. Use when you know what you're doing")
     .demand(1) //demands one positional argument
     .help('h')
     .alias('h', 'help')
@@ -113,7 +116,10 @@ if (argv.silent) {
 }
 winston.debug("initialized.");
 winston.debug(util.format("winston level is %s"), winston.level);
-
+if(argv.dev) {
+require('longjohn');
+winston.info("using longjohn for stacktraces");
+}
 var argv_trackers = argv.trackers.split(","); // convert the tracker string of trackers from the arguments to an array
 trackers = trackers.concat(argv_trackers); // append the parsed trackers to the array
 var arg1 = argv._[0]; //this is the info_hash, torrent file or magnet link the user specifies
@@ -227,7 +233,7 @@ if (!argv.disableDht) {
         })
         //fires once we are ready to receive stuff over DHT
     dht.on('ready', function() {
-            winston.info("DHT active");
+            winston.info("[DHT] active");
             // DHT is ready to use (i.e. the routing table contains at least K nodes, discovered
             // via the bootstrap nodes)
             // find peers for the given torrent info hash
@@ -270,8 +276,10 @@ if (!argv.disablePex) {
     	winston.error(util.format("Swarm Error: %s"));
     });
     swarm.on('wire', function(wire) {
-    	 
-        wire.use(ut_pex())
+    	wire.on('error', function(error) { 
+        	winston.error(util.format("PEX WIRE Error: %s")); //hopefully this fixes #10
+            });
+        wire.use(ut_pex());
         
     	// If you find a peer throught PEX, add it to the ip_hashmap then connect to it to get more peers.
         wire.ut_pex.on('error', function(error) { 
