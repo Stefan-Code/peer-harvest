@@ -69,8 +69,8 @@ var argv = require('yargs')
     .alias('p', 'torrent-port')
     .default('p', 6881)
     .describe('p', "The Port we are listening on for Bittorrent connections")
-    .default('max-connections', 20)
-    .describe('max-connections', 'Max. number of connections for PEX')
+    .default('max-connections', 2000)
+    .describe('max-connections', 'Max. number of connections for PEX. Higher Number = more peers, less responsiveness')
     .alias('l', 'trackers')
     .describe('l', "A comma seperated list of trackers to query")
     .default('l', "udp://open.demonii.com:1337,udp://tracker.coppersurfer.tk:6969")
@@ -202,7 +202,7 @@ if (torrent_type == "magnet") {
         //merging the existing tracker array with the trackers extracted from the torrent file
         trackers = trackers.concat(parsed.tr);
     }
-    winston.info(util.format("converted magnet to info hash: '%s'", parsed.infoHash)); // 'e3811b9539cacff680e418124272177c47477157'
+    winston.info(util.format("Converted magnet link to info hash: '%s'", parsed.infoHash)); //
     //set info hash to the one we got from the magnet link
     info_hash = parsed.infoHash;
 
@@ -218,7 +218,7 @@ if (torrent_type == "file") {
     var torrent = fs.readFileSync(arg1);
     //parse the torrent file contents
     var parsedTorrent = parseTorrent(torrent);
-    //BUG:#3
+    //BUG:#3. fixed.
     //hack required to somehow remove the trackers stored in the parsedTorrent object
     if (argv.disableTrackerParsing) {
         parsedTorrent.announce = [];
@@ -235,7 +235,7 @@ if (!argv.disableDht) {
     dht.listen(argv.dhtPort, function() {
             winston.info(util.format('[DHT] Listening on Port %d - This may take a while'), argv.dhtPort);
         })
-        //fires once we are ready to receive stuff over DHT
+    //fires once we are ready to receive stuff over DHT
     dht.on('ready', function() {
             winston.info("[DHT] active");
             // DHT is ready to use (i.e. the routing table contains at least K nodes, discovered
@@ -243,17 +243,17 @@ if (!argv.disableDht) {
             // find peers for the given torrent info hash
             dht.lookup(info_hash);
         })
-        //Fires on a DHT related error
+    //Fires on a DHT related error
     dht.on('error', function(err) {
             winston.error(util.format("[DHT] Error: %s", err));
         })
-        //fires ALWAYS when a peer has been discovered
+    //fires ALWAYS when a peer has been discovered
     dht.on('peer', function(addr, hash, from) {
             store_ip(get_ip(addr), get_port(addr));
             store_ip(get_ip(from), get_port(from));
             winston.debug(util.format('[DHT] found peer %s through %s', addr, from));
         })
-        //fires when the FIRST peer has been discovered
+    //fires when the FIRST peer has been discovered
     dht.once('peer', function(addr, hash, from) {
     	store_ip(get_ip(addr), get_port(addr));
     	store_ip(get_ip(from), get_port(from));
@@ -261,6 +261,7 @@ if (!argv.disableDht) {
     });
 }
 //setting a timeout to terminate the program. Otherwise it would just collect information indefinitely 
+//if timeouts are set to 0, we ignore them
 if (argv.timeout > 0) {
     setTimeout(timeoutCallback, 1000 * argv.timeout);
 }
@@ -281,24 +282,24 @@ if (!argv.disablePex) {
     });
     swarm.on('wire', function(wire) {
     	wire.on('error', function(error) { 
-        	winston.error(util.format("[PEX] WIRE Error: %s")); //hopefully this fixes #10
+        	winston.error(util.format("[PEX] WIRE Error: %s")); //hopefully this fixes #10. // No it doesn't.
             });
         wire.use(ut_pex());
-        
-    	// If you find a peer throught PEX, add it to the ip_hashmap then connect to it to get more peers.
         wire.ut_pex.on('error', function(error) { 
     	winston.error(util.format("[PEX] Error: %s"));
         });
+        //fires when a peers has been discovered through PEX
         wire.ut_pex.on('peer', function (peer) {
     	  var parts = peer.split(':');
     	  var peer_ip = parts[0];
     	  // Only add peers to the swarm that are unique. 
           if (!ip_hashmap.has(peer_ip)) {
     		  // Add discovered peers to the swarm and ask for more PEX
-               swarm.addPeer(peer)
+               swarm.addPeer(peer) //FIXME:? duplicate call to addPeer because sotre_ip does that already
+               //TODO: remove peer after 'questioning'?
                winston.debug(util.format('[PEX] found NEW peer %s | conns: %s', peer.rpad(" ", 22), swarm.numPeers));
           } else {
-//    	      winston.debug(util.format('[PEX] found OLD peer %s and con %s / %s', peer, swarm.numPeers, friends.length));
+//    	      winston.debug(util.format('[PEX] found OLD peer %s', peer));
           }
           if(!pex_active) {
         	  winston.info(util.format('[PEX] started receiving peers: %s', peer));
@@ -369,7 +370,7 @@ if (!argv.disableTrackers) {
     // scrape
     client.scrape();
     client.on('scrape', function(data) {
-        winston.debug(data);
+        //winston.debug('[TRACKER]' + data);
         winston.debug('[TRACKER] scrape response: ' + data.announce);
         winston.debug('[TRACKER] seeders: ' + data.complete);
         winston.debug('[TRACKER] leechers: ' + data.incomplete);
@@ -382,8 +383,9 @@ if (!argv.disableTrackers) {
 function store_ip(ip, port) {
         
         //ips.push(ip); //deprecated, we are using a hashmap instead
-        if (ip_hashmap.get(ip)) {
-            //ip already exists	
+        if (ip_hashmap.has(ip)) {
+            //ip already exists
+        	//Do nothing
         } else {
         	if (argv.printPeers) {
         		var line;
@@ -396,7 +398,7 @@ function store_ip(ip, port) {
                 console.log(line);
             }
             ip_hashmap.set(ip, port);
-            //set the peer to the current time
+            //set the last_peer time to the current time
             time_last_peer = new Date().getTime();
             if(!argv.disablePex) {
             swarm.addPeer(ip+":"+port);
@@ -413,10 +415,10 @@ process.on('SIGINT', function() {
 
 });
 
-//this fires once the timeout is reached
+//this fires once the timeout is reached or the user aborts the program (CTRL+C)
 function timeoutCallback() {
         terminating = true;
-        winston.info("Terminating because of timeout!");
+        winston.info("Terminating because of timeout!");  //FIXME:? not really true because a user abort also calls this
         
         //write gathered ips to file
         persist_ips();
@@ -457,11 +459,13 @@ function intervalCallback() {
         }
         time_last_peer = new Date().getTime();
     }
-    //debug function to list all gathered ips. Currently not used
+
+//debug function to list all gathered ips. Currently not used
 function debug_ips() {
         console.log(ip_hashmap.keys());
     }
-    //writes gathered ips to disk
+
+//writes gathered ips to disk
 function persist_ips() {
         check_outfile();
         if (argv.overwrite && is_file(argv.outFile) && !argv.disableOutFile) {
@@ -493,7 +497,7 @@ function persist_ips() {
 
         winston.info(util.format("Got %d ips", ip_hashmap.keys().length));
     }
-    //checks if a file exists on the filesystem
+//deletes the specified outfile (used by --overwrite)
 function delete_outfile() {
     try {
         fs.unlinkSync(argv.outFile);
@@ -506,7 +510,7 @@ function delete_outfile() {
     }
 
 }
-
+//checks if a file exists on the filesystem
 function is_file(file) {
     var throwOutfileError = false;
     try {
@@ -524,13 +528,8 @@ function is_file(file) {
         return true;
     };
 }
-//get ip adress from ip:port string
-function get_ip(ip_port_string) {
-	return ip_port_string.split(":")[0]
-}
-function get_port(ip_port_string) {
-	return ip_port_string.split(":")[1]
-}
+//checks if everything is fine with the outfile
+//TODO: try to open the file to see if we can really write to it
 function check_outfile() {
         if (!(argv.overwrite || argv.append || argv.disableOutFile)) {
 
@@ -546,6 +545,14 @@ function check_outfile() {
         }
     }
 
+//get ip adress from ip:port string
+function get_ip(ip_port_string) {
+	return ip_port_string.split(":")[0];
+}
+
+function get_port(ip_port_string) {
+	return ip_port_string.split(":")[1];
+}
 //returns a random number between min and max. Currently unused
 function getRandomArbitrary(min, max) {
         return Math.random() * (max - min) + min;
