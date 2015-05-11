@@ -27,6 +27,8 @@ var ip_hashmap = new HashMap();
 var trackers = [];
 // winston.level = 'debug';
 //enable some color magic with winston
+//TODO: Group all logging output into categories (e.g. [PEX], [DHT] and pad the category strings -> all messages on same identation level
+//TODO: Add option to log to file
 winston.cli();
 //this check is to make sure not all means of gathering IP addresses are disabled and that in general no conflicting options are set!
 var disable_check = function disable_check(argv, b) {
@@ -94,12 +96,16 @@ var argv = require('yargs')
     .describe("store-port", "Store the port of discovered peers in the outfile") //this breaks backwards compability
     .boolean("dev")
     .describe("dev", "Enables Development-only! features. Use when you know what you're doing")
-    .demand(1) //demands one positional argument
+    .version(function() {
+    return util.format("Version %s", require('./package.json').version);
+    })
+    .strict()
+    .demand(1) //demands one positional argument (filename, hash or magnet)
     .help('h')
-    .alias('h', 'help')
+    .alias('h', 'help') //h for help...
     .epilog("by stefan.github@gmail.com")
-    .string('_') //TODO: what the heck does this do again??
-    .check(disable_check)
+    .string('_') //Force non hyphenated arguments to be treated as a string
+    .check(disable_check) //check if the combination of some args are valid
     .argv;
 //setup logging verbosity
 if (argv.v <= 0) {
@@ -116,13 +122,19 @@ if (argv.v >= 3) {
 }
 if (argv.silent) {
     winston.remove(winston.transports.Console);
-
 }
 winston.debug("initialized.");
 winston.debug(util.format("winston level is %s"), winston.level);
 if(argv.dev) {
 require('longjohn');
 winston.info("[DEV] using longjohn for stacktraces");
+}
+//warn the user on certain conditions
+if(argv.storePort && argv.disableOutFile) {
+	winston.warn("[FILE] --store-port has no effect when out file is disabled!");
+}
+if(argv.printPort && !argv.printPeers) {
+	winston.warn("--print-port has no effect when --print-peers is disabled!");
 }
 var argv_trackers = argv.trackers.split(","); // convert the tracker string of trackers from the arguments to an array
 trackers = trackers.concat(argv_trackers); // append the parsed trackers to the array
@@ -315,7 +327,18 @@ if (!argv.disableTrackers) {
     trackers = trackers.filter(function(elem, pos) {
         return trackers.indexOf(elem) == pos;
     });
-    winston.info(util.format("[TRACKER] List contains: %s", trackers.join(", ")));
+    trackers = cleanArray(trackers);
+    winston.info(util.format("[TRACKER] List contains: %d items: %s", trackers.length, trackers.join(", ")));
+    if(trackers.length == 0) {
+    	winston.warn("[TRACKER] list is empty")
+    }
+    if(trackers.length == 0 && argv.disableDht) {
+    	winston.error("[TRACKER] no trackers at all and DHT is disabled. Can't find any peers")
+    	throw {
+            name: "Tracker Error",
+            message: util.format("[TRACKER] No trackers at all found/specified and DHT disabled. Can't find any peers. Please enable DHT or specify trackers"),
+        };
+    }
     //hackish way of construction a fake torrent object from the magnet link. Seems to work though :D
     if (torrent_type == "magnet" || torrent_type == "hash") {
         var parsedTorrent = {
@@ -390,10 +413,10 @@ function store_ip(ip, port) {
         	if (argv.printPeers) {
         		var line;
         		if(argv.printPort) {
-            		line = key +":"+value;
+            		line = ip +":"+port;
             	}
             	else {
-            		line = key;
+            		line = ip;
             	}
                 console.log(line);
             }
@@ -579,3 +602,12 @@ String.prototype.rpad = function(padString, length) {
         str = str + padString;
     return str;
 }
+function cleanArray(actual){
+	  var newArray = new Array();
+	  for(var i = 0; i<actual.length; i++){
+	      if (actual[i]){
+	        newArray.push(actual[i]);
+	    }
+	  }
+	  return newArray;
+	}
