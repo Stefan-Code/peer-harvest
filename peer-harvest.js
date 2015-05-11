@@ -69,7 +69,7 @@ var argv = require('yargs')
     .alias('p', 'torrent-port')
     .default('p', 6881)
     .describe('p', "The Port we are listening on for Bittorrent connections")
-    .default('max-connections', 2000)
+    .default('max-connections', 20)
     .describe('max-connections', 'Max. number of connections for PEX')
     .alias('l', 'trackers')
     .describe('l', "A comma seperated list of trackers to query")
@@ -88,6 +88,10 @@ var argv = require('yargs')
     .describe("overwrite", "Overwrite output file if it already exists")
     .boolean("append")
     .describe("append", "Append to the output file if it already exists - CAREFUL: This may lead to duplicates in the output file!")
+    .boolean("print-port")
+    .describe("print-port", "Print the port of discovered peers when using --print-peers") //this breaks backwards compability
+    .boolean("store-port")
+    .describe("store-port", "Store the port of discovered peers in the outfile") //this breaks backwards compability
     .boolean("dev")
     .describe("dev", "Enables Development-only! features. Use when you know what you're doing")
     .demand(1) //demands one positional argument
@@ -118,7 +122,7 @@ winston.debug("initialized.");
 winston.debug(util.format("winston level is %s"), winston.level);
 if(argv.dev) {
 require('longjohn');
-winston.info("using longjohn for stacktraces");
+winston.info("[DEV] using longjohn for stacktraces");
 }
 var argv_trackers = argv.trackers.split(","); // convert the tracker string of trackers from the arguments to an array
 trackers = trackers.concat(argv_trackers); // append the parsed trackers to the array
@@ -160,10 +164,10 @@ if (arg1.endsWith(".torrent")) {
             winston.debug(util.format("torrent_type is %s", torrent_type));
         }
     } catch (e) {
-        winston.error("The Torrent File you specified cannot be found. Please check if the file exists and the name is correct.");
+        winston.error("[FILE] The Torrent File you specified cannot be found. Please check if the file exists and the name is correct.");
         throw {
             name: "File Error",
-            message: util.format("The .torrent file '%s' you specified doesn't exist", arg1),
+            message: util.format("[FILE] The .torrent file '%s' you specified doesn't exist", arg1),
         };
     };
 }
@@ -209,7 +213,7 @@ if (torrent_type == "hash") {
     winston.debug(util.format("info_hash is '%s'", info_hash));
 }
 if (torrent_type == "file") {
-    winston.debug(util.format("reading file '%s'", arg1));
+    winston.debug(util.format("[FILE] reading '%s'", arg1));
     //read the torrent file synchronously and store it's contents
     var torrent = fs.readFileSync(arg1);
     //parse the torrent file contents
@@ -222,14 +226,14 @@ if (torrent_type == "file") {
     }
     //set the info hash to the one we got from the torrent file
     info_hash = parsedTorrent.infoHash;
-    winston.info(util.format("Torrent File has info hash '%s'", info_hash));
+    winston.info(util.format("[FILE] Torrent has info hash '%s'", info_hash));
 }
 //If DHT is not explicitly disabled by the user, use it.
 if (!argv.disableDht) {
     var dht = new DHT();
     //set DTH to listen on the specified (or default) port
     dht.listen(argv.dhtPort, function() {
-            winston.info(util.format('DHT Listening on Port %d - This may take a while'), argv.dhtPort);
+            winston.info(util.format('[DHT] Listening on Port %d - This may take a while'), argv.dhtPort);
         })
         //fires once we are ready to receive stuff over DHT
     dht.on('ready', function() {
@@ -241,7 +245,7 @@ if (!argv.disableDht) {
         })
         //Fires on a DHT related error
     dht.on('error', function(err) {
-            winston.error(util.format("An Error occured with DHT: %s", err));
+            winston.error(util.format("[DHT] Error: %s", err));
         })
         //fires ALWAYS when a peer has been discovered
     dht.on('peer', function(addr, hash, from) {
@@ -267,23 +271,23 @@ if (argv.timeoutNoPeers > 0) {
 //If Trackers are not explicitly disabled, use them!
 if (!argv.disablePex) {
 	// PEX connection using bittorrent-swarm to handle connections.
-    winston.info(util.format("Joining swarm for PEX"));
+    winston.info(util.format("[PEX] Joining swarm"));
     var swarm = new Swarm(info_hash, peerId);
     //FIXME: Add switch to customize port for PEX
 	//HACK:
     swarm.maxConns = argv.maxConnections;
     swarm.on('error', function(error) { 
-    	winston.error(util.format("Swarm Error: %s"));
+    	winston.error(util.format("[PEX] Swarm Error: %s"));
     });
     swarm.on('wire', function(wire) {
     	wire.on('error', function(error) { 
-        	winston.error(util.format("PEX WIRE Error: %s")); //hopefully this fixes #10
+        	winston.error(util.format("[PEX] WIRE Error: %s")); //hopefully this fixes #10
             });
         wire.use(ut_pex());
         
     	// If you find a peer throught PEX, add it to the ip_hashmap then connect to it to get more peers.
         wire.ut_pex.on('error', function(error) { 
-    	winston.error(util.format("PEX Error: %s"));
+    	winston.error(util.format("[PEX] Error: %s"));
         });
         wire.ut_pex.on('peer', function (peer) {
     	  var parts = peer.split(':');
@@ -292,7 +296,7 @@ if (!argv.disablePex) {
           if (!ip_hashmap.has(peer_ip)) {
     		  // Add discovered peers to the swarm and ask for more PEX
                swarm.addPeer(peer)
-               winston.debug(util.format('[PEX] found NEW peer %s | con %s / %s', peer, swarm.numPeers, ip_hashmap.keys().length));
+               winston.debug(util.format('[PEX] found NEW peer %s | conns: %s', peer.rpad(" ", 22), swarm.numPeers));
           } else {
 //    	      winston.debug(util.format('[PEX] found OLD peer %s and con %s / %s', peer, swarm.numPeers, friends.length));
           }
@@ -310,7 +314,7 @@ if (!argv.disableTrackers) {
     trackers = trackers.filter(function(elem, pos) {
         return trackers.indexOf(elem) == pos;
     });
-    winston.info(util.format("Deduped Tracker List contains: %s", trackers.join(", ")));
+    winston.info(util.format("[TRACKER] List contains: %s", trackers.join(", ")));
     //hackish way of construction a fake torrent object from the magnet link. Seems to work though :D
     if (torrent_type == "magnet" || torrent_type == "hash") {
         var parsedTorrent = {
@@ -322,17 +326,17 @@ if (!argv.disableTrackers) {
     //set the bittorrent port
     var bt_port = argv.torrentPort;
 
-    winston.info(util.format("Preparing to listen for Bittorrent connections on %s", bt_port));
+    winston.info(util.format("[TRACKER] Preparing to listen for Bittorrent connections on %s", bt_port));
     var client = new Client(peerId, bt_port, parsedTorrent);
     //fires on a bittorrent related error
     client.on('error', function(err) {
             // fatal client error!
-            winston.error(util.format("An Error occured during tracker scrape: %s", err));
+            winston.error(util.format("[TRACKER] An Error occured during tracker scrape: %s", err));
         })
         //fires on a bittorrent related warning
     client.on('warning', function(err) {
         // a tracker was unavailable or sent bad data to the client. you can probably ignore it
-        winston.warn(util.format("A Warning occured during tracker scrape: %s", err));
+        winston.warn(util.format("[TRACKER] warning: %s", err));
     })
 
     // start getting peers from the tracker
@@ -340,9 +344,9 @@ if (!argv.disableTrackers) {
     //fires when we get updated info from a tracker
     client.on('update', function(data) {
             winston.debug(data);
-            winston.debug('Tracker Announce: ' + data.announce);
-            winston.debug('Seeders: ' + data.complete);
-            winston.debug('Leechers: ' + data.incomplete);
+            winston.debug('[TRACKER] Announce: ' + data.announce);
+            winston.debug('[TRACKER] Seeders: ' + data.complete);
+            winston.debug('[TRACKER] Leechers: ' + data.incomplete);
         })
         //fires ALWAYS when a peer is found
     client.on('peer', function(addr) {
@@ -366,17 +370,13 @@ if (!argv.disableTrackers) {
     client.scrape();
     client.on('scrape', function(data) {
         winston.debug(data);
-        winston.debug('scrape response: ' + data.announce);
-        winston.debug('seeders: ' + data.complete);
-        winston.debug('leechers: ' + data.incomplete);
-        winston.debug('total downloads of torrent: ' + data.incomplete);
+        winston.debug('[TRACKER] scrape response: ' + data.announce);
+        winston.debug('[TRACKER] seeders: ' + data.complete);
+        winston.debug('[TRACKER] leechers: ' + data.incomplete);
+        winston.debug('[TRACKER] total downloads of torrent: ' + data.incomplete);
     });
 }
 
-function add_ip_to_swarm(ip) {
-	
-	
-} 
 //storage functions
 //store a ip adress (in hashmap, this doesn't write to disk. see persist_ips() for that)
 function store_ip(ip, port) {
@@ -386,7 +386,14 @@ function store_ip(ip, port) {
             //ip already exists	
         } else {
         	if (argv.printPeers) {
-                console.log(ip);
+        		var line;
+        		if(argv.printPort) {
+            		line = key +":"+value;
+            	}
+            	else {
+            		line = key;
+            	}
+                console.log(line);
             }
             ip_hashmap.set(ip, port);
             //set the peer to the current time
@@ -409,7 +416,7 @@ process.on('SIGINT', function() {
 //this fires once the timeout is reached
 function timeoutCallback() {
         terminating = true;
-        winston.info("terminating because of timeout!");
+        winston.info("Terminating because of timeout!");
         
         //write gathered ips to file
         persist_ips();
@@ -465,13 +472,20 @@ function persist_ips() {
         if (!argv.disableOutFile) {
             ip_hashmap.forEach(function(value, key) {
             	try {
-                fs.appendFileSync(argv.outFile, key +":"+value+'\n');
+            	var line;
+            	if(argv.storePort) {
+            		line = key +":"+value+'\n';
+            	}
+            	else {
+            		line = key+'\n';
+            	}
+                fs.appendFileSync(argv.outFile, line);
             	}
             	catch(e) {
-            		winston.error(util.format("Failed to write to file '%s'", argv.outFile));
+            		winston.error(util.format("[FILE] Failed to write to file '%s'", argv.outFile));
             		throw {
                         name: "File Error",
-                        message: util.format("The output file '%s' you specified could not be opened.", argv.outFile),
+                        message: util.format("[FILE] The output file '%s' you specified could not be opened.", argv.outFile),
                     };
             	}
             });
@@ -542,3 +556,19 @@ function choose(choices) {
     var index = Math.floor(Math.random() * choices.length);
     return choices[index];
 };
+
+//pads string left
+String.prototype.lpad = function(padString, length) {
+	var str = this;
+    while (str.length < length)
+        str = padString + str;
+    return str;
+}
+ 
+//pads string right
+String.prototype.rpad = function(padString, length) {
+	var str = this;
+    while (str.length < length)
+        str = str + padString;
+    return str;
+}
