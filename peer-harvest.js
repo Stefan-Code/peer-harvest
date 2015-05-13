@@ -612,9 +612,25 @@ String.prototype.rpad = function(padString, length) {
 function cleanArray(actual){
 	  var newArray = new Array();
 	  for(var i = 0; i<actual.length; i++){
-	      if (actual[i]){
+	      if (validateTracker(actual[i])){
 	        newArray.push(actual[i]);
 	    }
 	  }
 	  return newArray;
 	}
+function escapeRegExp(string) {
+    return string.replace(/([.*+?^=!:${}()|\[\]\/\\])/g, "\\$1");
+}
+function replaceAll(string, find, replace) {
+	  return string.replace(new RegExp(escapeRegExp(find), 'g'), replace);
+	}
+//function to validate tracker urls
+function validateTracker(tracker) {
+	if(!(tracker.startsWith("udp://") || tracker.startsWith("http://" || tracker.startsWith("https://")))) { //TODO: are https trackers allowed?
+		return false;
+	}
+	if(!replaceAll(tracker, " ", "")) {
+		return false;
+	}
+	return true;
+}
