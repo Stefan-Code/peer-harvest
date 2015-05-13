@@ -236,6 +236,7 @@ if (torrent_type == "file") {
         parsedTorrent.announce = [];
         parsedTorrent.announceList = [];
     }
+
     //set the info hash to the one we got from the torrent file
     info_hash = parsedTorrent.infoHash;
     winston.info(util.format("[FILE] Torrent has info hash '%s'", info_hash));
@@ -338,6 +339,12 @@ if (!argv.disableTrackers) {
             name: "Tracker Error",
             message: util.format("[TRACKER] No trackers at all found/specified and DHT disabled. Can't find any peers. Please enable DHT or specify trackers"),
         };
+    }
+    //this should fix #11
+    if(torrent_type == "file" && trackers.length > 0) {
+    	winston.info("[TRACKER] added custom trackers to torrent file");
+    	parsedTorrent["announce"] = trackers.concat(parsedTorrent["announce"]);
+    	parsedTorrent["announceList"] = trackers.concat(parsedTorrent["announceList"]);
     }
     //hackish way of construction a fake torrent object from the magnet link. Seems to work though :D
     if (torrent_type == "magnet" || torrent_type == "hash") {
