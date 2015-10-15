@@ -13,7 +13,7 @@ For built-in help run:
 ```bash
 node peer-harvest.js --help
 ```
-Please note that you may have to manually symlink node to nodejs. (or use `nodejs peer-harvest.js --help`
+Please note that you may have to manually symlink node to nodejs. (or use `nodejs peer-harvest.js --help`)
 For using it with a .torrent file run:
 ```bash
 node peer-harvest.js --out-file peers.txt example.torrent
