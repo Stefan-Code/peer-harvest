@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 //@author: Stefan.github@gmail.com
 //require filesystem stuff
 var fs = require("fs");
