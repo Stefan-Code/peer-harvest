@@ -17,7 +17,7 @@
   },
   "homepage": "https://github.com/Stefan-Code/peer-harvest",
   "dependencies": {
-    "bittorrent-dht": "^3.0.0",
+    "bittorrent-dht": "^5.0.0",
     "magnet-uri": "^4.2.2",
     "string.prototype.endswith": "^0.2.0",
     "string.prototype.startswith": "^0.2.0",
